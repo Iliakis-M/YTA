@@ -5,7 +5,7 @@
 // @updateURL		https://greasyfork.org/scripts/419583-youtube-automation/code/Youtube%20Automation.user.js
 // @installURL		https://greasyfork.org/scripts/419583-youtube-automation/code/Youtube%20Automation.user.js
 // @downloadURL		https://greasyfork.org/scripts/419583-youtube-automation/code/Youtube%20Automation.user.js
-// @version			2.2.4
+// @version			2.2.5
 // @description		Automatically cancels dialogs and removes Ads, making YouTube friendlier and lightweight.
 // @author			V. H.
 // @defaulticon		https://www.google.com/s2/favicons?domain=youtube.com
@@ -22,6 +22,7 @@
 // @grant			GM_registerMenuCommand
 // @require			https://greasyfork.org/scripts/419588-uniq/code/UniQ.js
 // @require			https://greasyfork.org/scripts/423445-ytdc/code/YTDC.js
+// @require			https://greasyfork.org/scripts/427124-filtera/code/Filtera.js
 // @connect			self
 // @run-at			document-body
 // @compatible		Chrome
@@ -92,6 +93,7 @@
 		right: 0;
 		transition: width 1s, opacity 1s;
 		z-index: 999;
+		cursor: default;
 	}
 	::-webkit-scrollbar:hover, ::-webkit-scrollbar:focus {
 		opacity: 1;
@@ -99,11 +101,13 @@
 	::-webkit-scrollbar-track {
 		box-shadow: inset 0 0 3px grey;
 		border-radius: 5px;
+		cursor: default;
 	}
 	::-webkit-scrollbar-thumb {
 		background-color: rgba(150, 150, 150, .8);
 		border-radius: 5px;
 		box-shadow: inset 0 0 2px 1px lightgray;
+		cursor: default;
 	}
 	::-webkit-scrollbar-button {
 		background-color: rgba(120, 120, 120, .8);
@@ -221,7 +225,8 @@
 		margin: 0;
 		padding: auto;
 		resize: both;
-		overflow: auto;
+		overflow-y: auto;
+		overflow-x: hidden;
 		overscroll-behavior: contain;
 		scrollbar-width: thin;
 		scrollbar-gutter: stable;
@@ -233,8 +238,13 @@
 		color: rgb(15, 15, 15);
 		display: block flex;
 		flex-flow: column wrap;
-		max-height: 60vh;
+		align-items: baseline;
+		align-content: center;
+		justify-content: space-around;
+		min-height: 20vh;
+		max-height: 70vh;
 		max-width: 90vw;
+		min-width: 20vw;
 	}
 	#_YTA_Panel:hover {
 		opacity: .85;
@@ -245,15 +255,29 @@
 		padding: 1px;
 		height: auto;
 		width: auto;
-		display: block flex;
-		flex-flow: column wrap;
-		align-items: baseline;
-		align-content: center;
-		justify-content: space-around;
 		border: 1px ridge black;
 		font-size: 1.05em;
 		cursor: default;
 		overflow: auto;
+		border-radius: 5px;
+	}
+	#_YTA_Panel form {
+		display: block flex;
+		flex-flow: column wrap;
+		overflow-y: auto;
+		overflow-x: hidden;
+		overscroll-behavior: contain;
+		scrollbar-width: thin;
+		scrollbar-gutter: stable;
+		text-align: center;
+		vertical-align: middle;
+		margin: 0;
+		padding: auto;
+		resize: both;
+		border-radius: 5px;
+		align-items: baseline;
+		align-content: center;
+		justify-content: space-around;
 	}
 	#_YTA_Panel form * {
 		margin: auto;
@@ -324,49 +348,52 @@
 			return false;
 		}),
 		makepanel = () => unsafeWindow.do_if(!document.getElementById("_YTA_Panel") && unsafeWindow.videoPlayer, p => {
-			const ppanel = document.createElement("form"), //input wrapper, under root
-				diag = document.createElement("dialog"), //root
+			let diag = document.createElement("dialog"), //root
 				hidepanel = document.createElement("button"), //hide
 				rreload = document.createElement("button"), //reload
 				ssave = document.createElement("button"), //download
-				volume = document.createElement("input"), //volume text
-				volume2 = document.createElement("input"), //volume range
-				volumel = document.createElement("label"), //volume label
 				filtereset = document.createElement("button"), //reset filters
 				field = document.createElement("fieldset"), //utils
 				fieldl = document.createElement("legend"), //utils label
 				filter = document.createElement("fieldset"), //filters
 				filterl = document.createElement("legend"), //filters label
-				blur = document.createElement("input"), //blur text
-				blurl = document.createElement("label"), //blur label
-				bright = document.createElement("input"), //brightness text
-				brightl = document.createElement("label"), //brightness label
-				contra = document.createElement("input"), //contrast text
-				contral = document.createElement("label"), //contrast label
-				grays = document.createElement("input"), //contrast text
-				grays2 = document.createElement("input"), //contrast range
-				graysl = document.createElement("label"), //contrast label
-				hue = document.createElement("input"), //hue-rotate text
-				hue2 = document.createElement("input"), //hue-rotate range
-				huel = document.createElement("label"), //hue-rotate label
-				invert = document.createElement("input"), //invert text
-				invert2 = document.createElement("input"), //invert range
-				invertl = document.createElement("label"), //invert label
-				opacity = document.createElement("input"), //opacity text
-				opacity2 = document.createElement("input"), //opacity range
-				opacityl = document.createElement("label"), //opacity label
-				saturate = document.createElement("input"), //saturate text
-				saturatel = document.createElement("label"), //saturate label
-				sepia = document.createElement("input"), //sepia text
-				sepia2 = document.createElement("input"), //sepia text
-				sepial = document.createElement("label"), //sepia label
-				speed = document.createElement("input"), //speed text
-				speedl = document.createElement("label"), //speed label
-				nullish = document.createElement("img"); //drag shadow
-			let x = 0, y = 0, drg = false,
-				filterstr = GM_getValue("filter", `blur(0px) brightness(100%) contrast(100%) grayscale(0%) hue-rotate(0deg) invert(0%) opacity(100%) saturate(100%) sepia(0%)`);
+				nullish = document.createElement("img"), //drag shadow
+				flt = unsafeWindow.flt = _FLT.init(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer, (prop, val) => {
+					if (prop == "speed") {
+						if (unsafeWindow.videoPlayer) {
+							let targ = unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer;
+							
+							if (targ.setPlaybackRate) targ.setPlaybackRate(val);
+							else targ.playbackRate = val;
+						}
+						
+						return true;
+					} else if (prop == "volume") {
+						if (unsafeWindow.videoPlayer) unsafeWindow.videoPlayer.setVolume(val);
+						
+						return true;
+					} else return false;
+					
+					GM_setValue("filter", flt.filter);
+				}), x = 0, y = 0, drg = false,
+				speed = _FLT.HTMLM.inp("number", 0.065, 3.9, 1, 3, 0.1, 0, /^\d(\.\d{1,2})?$/i, "Speed", "0.63 >= Speed >= 3.9", "speed"),
+				volume = _FLT.HTMLM.inp("number", 0, 100, 1, 3, 1, 100, /^\d(\.\d{1,2})?$/i, "Volume", "0.63 >= Volume >= 3.9", "volume");
 			
-			(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer).style.filter = filterstr;
+			speed.id = "_flt_speed" + flt.htmlmap.id;
+			volume.id = "_flt_volume" + flt.htmlmap.id;
+			
+			Object.assign(flt.htmlm, flt.htmlm.setup({
+				speed:		speed,
+				speedr:		_FLT.HTMLM.inp("range", 0.065, 3.9, 1, 3, 0.1, 0, /^\d(\.\d{1,2})?$/i, "Speed", "0.63 >= Speed >= 3.9", "speed"),
+				speedl:		_FLT.HTMLM.lab(speed.id, "Speed"),
+				volume:		volume,
+				volumer:	_FLT.HTMLM.inp("range", 0, 100, 1, 3, 1, 100, /^\d(\.\d{1,2})?$/i, "Volume", "0.63 >= Volume >= 3.9", "volume"),
+				volumel:	_FLT.HTMLM.lab(volume.id, "Volume"),
+			}));
+			
+			flt.lay();
+			
+			(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer).style.filter = GM_getValue("filter", "");
 			
 			ssave.innerText = "Download";
 			ssave.id = "_YTA_Down";
@@ -405,14 +432,12 @@
 			field.onmousedown = m => { m.stopImmediatePropagation(); drg = false; diag.draggable = false; };
 			fieldl.innerText = "YTA Panel";
 			filterl.innerText = "Player Filters";
-			ppanel.novalidate = true;
-			ppanel.onsubmit = e => { e.preventDefault(); e.stopImmediatePropagation(); return false; };
 			
 			diag.id = "_YTA_Panel";
 			diag.draggable = false;
 			diag.classList.toggle("_YTA_hidden");
 			diag.onmousedown = diag.ondragstart = m => {
-				if (m.offsetX >= m.target.offsetWidth * .95) return;
+				if (m.offsetX >= m.target.offsetWidth - 15) return;
 				
 				if (m.dataTransfer) {
 					m.dataTransfer.effectAllowed = m.dataTransfer.dropEffect = "move";
@@ -459,336 +484,16 @@
 					else targ.playbackRate = 1;
 				}
 				
-				sepia.value = sepia2.value = blur.value = grays.value = grays2.value = hue.value = hue2.value = invert.value = invert2.value = 0;
-				speed.value = 1;
-				saturate.value = bright.value = contra.value = opacity.value = opacity2.value = 100;
+				GM_setValue("filter", `blur(0px) brightness(100%) contrast(100%) grayscale(0%) hue-rotate(0deg) invert(0%) opacity(100%) saturate(100%) sepia(0%)`);
 			};
-			//-----
-			speed.type = sepia.type = saturate.type = opacity.type = invert.type = hue.type = grays.type = contra.type = bright.type = blur.type = volume.type = "number";
-			sepia2.type = opacity2.type = invert2.type = hue2.type = grays2.type = volume2.type = "range";
-			speed.pattern = saturate.pattern = contra.pattern = bright.pattern = blur.pattern = /\d*/i;
-			hue.pattern = hue2.pattern = /^((1|2)\d{2}|3[0-5]\d|\d{1,2})$/i;
-			sepia2.pattern = sepia.pattern = opacity2.pattern = opacity.pattern = invert2.pattern = invert.pattern = grays2.pattern = grays.pattern = volume.pattern = volume2.pattern = /^((100)|\d{1,2})$/i;
-			volume2.onwheel = volume.onwheel = m => {
-				m.preventDefault();
-				m.stopPropagation();
-				
-				if (m.target.value - Math.sign(m.deltaY) * m.target.step >= m.target.min && m.target.value - Math.sign(m.deltaY) * m.target.step <= m.target.max) {
-					volume2.value = volume.value -= Math.sign(m.deltaY) * m.target.step;
-					
-					if (unsafeWindow.videoPlayer) unsafeWindow.videoPlayer.setVolume(m.target.value);
-				}
-				
-				return false;
-			};
-			grays2.onwheel = grays.onwheel = m => {
-				m.preventDefault();
-				m.stopPropagation();
-				
-				if (m.target.value - Math.sign(m.deltaY) * m.target.step >= m.target.min && m.target.value - Math.sign(m.deltaY) * m.target.step <= m.target.max) {
-					grays2.value = grays.value -= Math.sign(m.deltaY) * m.target.step;
-					
-					if (unsafeWindow.videoPlayer)
-						(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer).style.filter = filterstr = filterstr.replace(/(?<=grayscale\()(\d{0,3}?)(?=%\))/gi, m.target.value);
-				}
-				
-				return false;
-			};
-			sepia2.onwheel = sepia.onwheel = m => {
-				m.preventDefault();
-				m.stopPropagation();
-				
-				if (m.target.value - Math.sign(m.deltaY) * m.target.step >= m.target.min && m.target.value - Math.sign(m.deltaY) * m.target.step <= m.target.max) {
-					sepia2.value = sepia.value -= Math.sign(m.deltaY) * m.target.step;
-					
-					if (unsafeWindow.videoPlayer)
-						(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer).style.filter = filterstr = filterstr.replace(/(?<=sepia\()(\d{0,3}?)(?=%\))/gi, m.target.value);
-				}
-				
-				return false;
-			};
-			hue2.onwheel = hue.onwheel = m => {
-				m.preventDefault();
-				m.stopPropagation();
-				
-				if (m.target.value - Math.sign(m.deltaY) * m.target.step >= m.target.min && m.target.value - Math.sign(m.deltaY) * m.target.step <= m.target.max) {
-					hue2.value = hue.value -= Math.sign(m.deltaY) * m.target.step;
-					
-					if (unsafeWindow.videoPlayer)
-						(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer).style.filter = filterstr = filterstr.replace(/(?<=hue-rotate\()(\d{0,3}?)(?=deg\))/gi, m.target.value);
-				}
-				
-				return false;
-			};
-			invert2.onwheel = invert.onwheel = m => {
-				m.preventDefault();
-				m.stopPropagation();
-				
-				if (m.target.value - Math.sign(m.deltaY) * m.target.step >= m.target.min && m.target.value - Math.sign(m.deltaY) * m.target.step <= m.target.max) {
-					invert2.value = invert.value -= Math.sign(m.deltaY) * m.target.step;
-					
-					if (unsafeWindow.videoPlayer)
-						(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer).style.filter = filterstr = filterstr.replace(/(?<=invert\()(\d{0,3}?)(?=%\))/gi, m.target.value);
-				}
-				
-				return false;
-			};
-			opacity2.onwheel = opacity.onwheel = m => {
-				m.preventDefault();
-				m.stopPropagation();
-				
-				if (m.target.value - Math.sign(m.deltaY) * m.target.step >= m.target.min && m.target.value - Math.sign(m.deltaY) * m.target.step <= m.target.max) {
-					opacity2.value = opacity.value -= Math.sign(m.deltaY) * m.target.step;
-					
-					if (unsafeWindow.videoPlayer)
-						(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer).style.filter = filterstr = filterstr.replace(/(?<=opacity\()(\d{0,3}?)(?=%\))/gi, m.target.value);
-				}
-				
-				return false;
-			};
-			blur.onwheel = m => {
-				m.preventDefault();
-				m.stopPropagation();
-				
-				if (m.target.value - Math.sign(m.deltaY) * m.target.step >= m.target.min) {
-					m.target.value -= Math.sign(m.deltaY) * m.target.step;
-					
-					if (unsafeWindow.videoPlayer)
-						(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer).style.filter = filterstr = filterstr.replace(/(?<=blur\()(\d*?)(?=px\))/gi, m.target.value);
-				}
-				
-				return false;
-			};
-			speed.onwheel = m => {
-				m.preventDefault();
-				m.stopPropagation();
-				
-				if (m.target.value - Math.sign(m.deltaY) * m.target.step >= m.target.min && m.target.value - Math.sign(m.deltaY) * m.target.step <= m.target.max) {
-					m.target.value -= Math.sign(m.deltaY) * m.target.step;
-					
-					if (unsafeWindow.videoPlayer) {
-						let targ = unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer;
-						
-						if (targ.setPlaybackRate) targ.setPlaybackRate(m.target.value);
-						else targ.playbackRate = m.target.value;
-					}
-				}
-				
-				return false;
-			};
-			saturate.onwheel = m => {
-				m.preventDefault();
-				m.stopPropagation();
-				
-				if (m.target.value - Math.sign(m.deltaY) * m.target.step >= m.target.min) {
-					m.target.value -= Math.sign(m.deltaY) * m.target.step;
-					
-					if (unsafeWindow.videoPlayer)
-						(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer).style.filter = filterstr = filterstr.replace(/(?<=saturate\()(\d*?)(?=%\))/gi, m.target.value);
-				}
-				
-				return false;
-			};
-			bright.onwheel = m => {
-				m.preventDefault();
-				m.stopPropagation();
-				
-				if (m.target.value - Math.sign(m.deltaY) * m.target.step >= m.target.min) {
-					m.target.value -= Math.sign(m.deltaY) * m.target.step;
-					
-					if (unsafeWindow.videoPlayer)
-						(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer).style.filter = filterstr = filterstr.replace(/(?<=brightness\()(\d*?)(?=%\))/gi, m.target.value);
-				}
-				
-				return false;
-			};
-			contra.onwheel = m => {
-				m.preventDefault();
-				m.stopPropagation();
-				
-				if (m.target.value - Math.sign(m.deltaY) * m.target.step >= m.target.min) {
-					m.target.value -= Math.sign(m.deltaY) * m.target.step;
-					
-					if (unsafeWindow.videoPlayer)
-						(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer).style.filter = filterstr = filterstr.replace(/(?<=contrast\()(\d*?)(?=%\))/gi, m.target.value);
-				}
-				
-				return false;
-			};
-			speed.min = sepia.min = sepia2.min = saturate.min = opacity2.min = opacity.min = invert2.min = invert.min = hue2.min = hue.min = grays2.min = grays.min = contra.min = bright.min = blur.min = volume2.min = volume.min = 0;
-			hue2.max = hue.max = 359;
-			sepia.max = sepia2.max = opacity2.max = opacity.max = invert2.max = invert.max = grays2.max = grays.max = volume2.max = volume.max = 100;
-			speed.max = 3.9;
-			speed.step = 0.1;
-			sepia.step = sepia2.step = saturate.step = opacity2.step = opacity.step = invert2.step = invert.step = hue2.step = hue.step = grays2.step = grays.step = contra.step = bright.step = blur.step = volume2.step = volume.step = 1;
-			speed.maxlength = sepia.maxlength = sepia2.maxlength = saturate.maxlength = opacity2.maxlength = opacity.maxlength = invert2.maxlength = invert.maxlength = hue2.maxlength = hue.maxlength = grays2.maxlength = grays.maxlength = contra.maxlength = bright.maxlength = blur.maxlength = volume2.maxlength = volume.maxlength = 7;
-			speed.minlength = sepia.minlength = sepia2.minlength = saturate.minlength = opacity2.minlength = opacity.minlength = invert2.minlength = invert.minlength = hue2.minlength = hue.minlength = grays2.minlength = grays.minlength = contra.minlength = bright.minlength = blur.minlength = volume2.minlength = volume.minlength = 1;
-			speed.placeholder = "Speed";
-			sepia.placeholder = sepia2.placeholder = "Sepia";
-			saturate.placeholder = "Saturate";
-			opacity2.placeholder = opacity.placeholder = "Opacity";
-			invert2.placeholder = invert.placeholder = "Invert";
-			grays2.placeholder = grays.placeholder = "Grayscale";
-			hue2.placeholder = hue.placeholder = "Hue Rotation";
-			contra.placeholder = "Contrast";
-			bright.placeholder = "Brightness";
-			blur.placeholder = "Blur";
-			volume2.placeholder = volume.placeholder = "Volume";
-			speed.value = 1;
-			sepia2.value = sepia.value = invert2.value = invert.value = hue2.value = hue.value = grays2.value = grays.value = blur.value = 0;
-			saturate.value = opacity2.value = opacity.value = contra.value = bright.value = 100;
-			volume2.value = volume.value = unsafeWindow.videoPlayer ? unsafeWindow.videoPlayer.getVolume ? unsafeWindow.videoPlayer.getVolume() : 100 : 100;
-			volume2.oninput = volume2.onchange = volume.oninput = volume.onchange = e => {
-				e.preventDefault();
-				e.stopImmediatePropagation();
-				
-				if (e.target.value < 0 || e.target.value > 100) return false;
-				if (unsafeWindow.videoPlayer) unsafeWindow.videoPlayer.setVolume(e.target.value);
-				
-				volume.value = volume2.value = e.target.value;
-			};
-			blur.onchange = e => {
-				e.preventDefault();
-				e.stopImmediatePropagation();
-				
-				if (e.target.value < 0) return false;
-				
-				if (unsafeWindow.videoPlayer)
-					(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer).style.filter = filterstr = filterstr.replace(/(?<=blur\()(\d*?)(?=px\))/gi, e.target.value);
-			};
-			bright.onchange = e => {
-				e.preventDefault();
-				e.stopImmediatePropagation();
-				
-				if (e.target.value < 0) return false;
-				
-				if (unsafeWindow.videoPlayer)
-					(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer).style.filter = filterstr = filterstr.replace(/(?<=brightness\()(\d*?)(?=%\))/gi, e.target.value);
-			};
-			contra.onchange = e => {
-				e.preventDefault();
-				e.stopImmediatePropagation();
-				
-				if (e.target.value < 0) return false;
-				
-				if (unsafeWindow.videoPlayer)
-					(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer).style.filter = filterstr = filterstr.replace(/(?<=contrast\()(\d*?)(?=%\))/gi, e.target.value);
-			};
-			saturate.onchange = e => {
-				e.preventDefault();
-				e.stopImmediatePropagation();
-				
-				if (e.target.value < 0) return false;
-				
-				if (unsafeWindow.videoPlayer)
-					(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer).style.filter = filterstr = filterstr.replace(/(?<=saturate\()(\d*?)(?=%\))/gi, e.target.value);
-			};
-			speed.onchange = e => {
-				e.preventDefault();
-				e.stopImmediatePropagation();
-				
-				if (e.target.value < 0) return false;
-				
-				if (unsafeWindow.videoPlayer) {
-					let targ = unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer;
-					
-					if (targ.setPlaybackRate) targ.setPlaybackRate(e.target.value);
-					else targ.playbackRate = e.target.value;
-				}
-			};
-			grays2.oninput = grays.oninput = grays2.onchange = grays.onchange = e => {
-				e.preventDefault();
-				e.stopImmediatePropagation();
-				
-				if (e.target.value < 0 || e.target.value > 100) return false;
-				
-				if (unsafeWindow.videoPlayer)
-				(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer).style.filter = filterstr = filterstr.replace(/(?<=grayscale\()(\d{0,3}?)(?=%\))/gi, e.target.value);
-				
-				grays.value = grays2.value = e.target.value;
-			};
-			sepia2.oninput = sepia.oninput = sepia2.onchange = sepia.onchange = e => {
-				e.preventDefault();
-				e.stopImmediatePropagation();
-				
-				if (e.target.value < 0 || e.target.value > 100) return false;
-				
-				if (unsafeWindow.videoPlayer)
-				(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer).style.filter = filterstr = filterstr.replace(/(?<=sepia\()(\d{0,3}?)(?=%\))/gi, e.target.value);
-				
-				sepia2.value = sepia.value = e.target.value;
-			};
-			hue2.oninput = hue.oninput = hue2.onchange = hue.onchange = e => {
-				e.preventDefault();
-				e.stopImmediatePropagation();
-				
-				if (e.target.value < 0 || e.target.value > 359) return false;
-				
-				if (unsafeWindow.videoPlayer)
-					(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer).style.filter = filterstr = filterstr.replace(/(?<=hue-rotate\()(\d{0,3}?)(?=deg\))/gi, e.target.value);
-				
-				hue.value = hue2.value = e.target.value;
-			};
-			invert2.oninput = invert.oninput = invert2.onchange = invert.onchange = e => {
-				if (unsafeWindow.videoPlayer)
-					(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer).style.filter = filterstr = filterstr.replace(/(?<=invert\()(\d{0,3}?)(?=%\))/gi, e.target.value);
-				
-				invert2.value = invert.value = e.target.value;
-				
-				e.preventDefault();
-				e.stopImmediatePropagation();
-			};
-			opacity2.oninput = opacity.oninput = opacity2.onchange = opacity.onchange = e => {
-				if (unsafeWindow.videoPlayer)
-					(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer).style.filter = filterstr = filterstr.replace(/(?<=opacity\()(\d{0,3}?)(?=%\))/gi, e.target.value);
-				
-				opacity2.value = opacity.value = e.target.value;
-				
-				e.preventDefault();
-				e.stopImmediatePropagation();
-			};
-			volume.id = "_YTA_Panel_volume"; volume2.id = "_YTA_Panel_volume2"; volumel.for = "_YTA_Panel_volume"; volumel.innerText = "Volume";
-			blur.id = "_YTA_Panel_blur"; blurl.for = "_YTA_Panel_blur"; blurl.innerText = "Blur";
-			bright.id = "_YTA_Panel_bright"; brightl.for = "_YTA_Panel_bright"; brightl.innerText = "Brightness";
-			contra.id = "_YTA_Panel_contra"; contral.for = "_YTA_Panel_contra"; contral.innerText = "Contrast";
-			grays.id = "_YTA_Panel_grays"; graysl.for = "_YTA_Panel_grays"; graysl.innerText = "Grayscale";
-			hue.id = "_YTA_Panel_hue"; huel.for = "_YTA_Panel_hue"; huel.innerText = "Hue Rotate";
-			invert.id = "_YTA_Panel_invert"; invertl.for = "_YTA_Panel_invert"; invertl.innerText = "Invert";
-			opacity.id = "_YTA_Panel_opacity"; opacityl.for = "_YTA_Panel_opacity"; opacityl.innerText = "Opacity";
-			saturate.id = "_YTA_Panel_saturate"; saturatel.for = "_YTA_Panel_saturate"; saturatel.innerText = "Saturate";
-			sepia.id = "_YTA_Panel_sepia"; sepial.for = "_YTA_Panel_sepia"; sepial.innerText = "Sepia";
-			speed.id = "_YTA_Panel_speed"; speedl.for = "_YTA_Panel_speed"; speedl.innerText = "Speed";
-			
 			
 			filter.appendChild(filterl); field.appendChild(fieldl);
 			field.appendChild(hidepanel); field.appendChild(rreload); field.appendChild(filtereset);
 			field.appendChild(document.createElement("br"));
-			field.appendChild(volumel); field.appendChild(volume); field.appendChild(volume2);
-			field.appendChild(document.createElement("br"));
-			field.appendChild(speedl); field.appendChild(speed);
-			field.appendChild(document.createElement("br"));
 			field.appendChild(ssave);
 			field.appendChild(document.createElement("hr"));
 			
-			filter.appendChild(opacityl); filter.appendChild(opacity); filter.appendChild(opacity2);
-			filter.appendChild(document.createElement("br"));
-			filter.appendChild(brightl); filter.appendChild(bright);
-			filter.appendChild(document.createElement("br"));
-			filter.appendChild(contral); filter.appendChild(contra);
-			filter.appendChild(document.createElement("br"));
-			filter.appendChild(saturatel); filter.appendChild(saturate);
-			filter.appendChild(document.createElement("br"));
-			filter.appendChild(huel); filter.appendChild(hue); filter.appendChild(hue2);
-			filter.appendChild(document.createElement("br"));
-			filter.appendChild(invertl); filter.appendChild(invert); filter.appendChild(invert2);
-			filter.appendChild(document.createElement("br"));
-			filter.appendChild(sepial); filter.appendChild(sepia); filter.appendChild(sepia2);
-			filter.appendChild(document.createElement("br"));
-			filter.appendChild(graysl); filter.appendChild(grays); filter.appendChild(grays2);
-			filter.appendChild(document.createElement("br"));
-			filter.appendChild(blurl); filter.appendChild(blur);
-			
-			field.appendChild(filter); ppanel.appendChild(field); diag.appendChild(ppanel);
+			flt.addTo(filter); field.appendChild(filter); diag.appendChild(field);
 			document.body.appendChild(diag);
 			
 			GM_log("_YTA_Panel created.");
@@ -797,6 +502,8 @@
 				GM_deleteValue("sticky1");
 				panel();
 			}
+			
+			return true;
 		}),
 		makebtn = () => unsafeWindow.do_if(!document.getElementById("_YTA_Top") && document.body, e => {
 			const btn = document.createElement("button"),
