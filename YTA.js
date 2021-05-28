@@ -358,7 +358,7 @@
 				filter = document.createElement("fieldset"), //filters
 				filterl = document.createElement("legend"), //filters label
 				nullish = document.createElement("img"), //drag shadow
-				flt = unsafeWindow.flt = _FLT.init(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer, (prop, val) => {
+				flt = unsafeWindow.flt = unsafeWindow._FLT.init(unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer, (prop, val) => {
 					if (prop == "speed") {
 						if (unsafeWindow.videoPlayer) {
 							let targ = unsafeWindow.videoPlayer._p || unsafeWindow.videoPlayer;

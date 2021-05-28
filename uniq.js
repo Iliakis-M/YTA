@@ -5,7 +5,7 @@
 // @updateURL		https://greasyfork.org/scripts/419588-uniq/code/UniQ.js
 // @installURL		https://greasyfork.org/scripts/419588-uniq/code/UniQ.js
 // @downloadURL		https://greasyfork.org/scripts/419588-uniq/code/UniQ.js
-// @version			1.1
+// @version			1.2
 // @description		Utilities for faster development.
 // @author			V. H.
 // @license			AFL-3.0
@@ -16,6 +16,8 @@
  * @file uniq.js
  * @since 3/1/2021
  */
+ 
+ if (typeof unsafeWindow == "undefined") unsafeWindow = window;
 
 /**
  * Executes only once.
@@ -591,14 +593,183 @@ for (const i in unsafeWindow) {
 	}
 }
 
-if (HTMLCollection && !HTMLCollection.prototype.forEach) HTMLCollection.prototype.forEach = Array.prototype.forEach;
-if (HTMLCollection && !HTMLCollection.prototype.filter) HTMLCollection.prototype.filter = Array.prototype.filter;
-if (HTMLCollection && !HTMLCollection.prototype.find) HTMLCollection.prototype.find = Array.prototype.find;
-if (HTMLCollection && !HTMLCollection.prototype.findIndex) HTMLCollection.prototype.find = Array.prototype.findIndex;
-if (HTMLCollection && !HTMLCollection.prototype.findAll) HTMLCollection.prototype.findAll = Array.prototype.findAll;
-if (HTMLCollection && !HTMLCollection.prototype.some) HTMLCollection.prototype.some = Array.prototype.some;
-if (HTMLCollection && !HTMLCollection.prototype.every) HTMLCollection.prototype.every = Array.prototype.every;
-if (HTMLCollection && !HTMLCollection.prototype.splice) HTMLCollection.prototype.splice = Array.prototype.splice;
+/**
+ * A better Wrapper for Proxy
+ * 
+ * @since 28/5/2021
+ */
+if (!unsafeWindow._Binder) unsafeWindow._Binder = class Binder {
+	
+	constructor(target) {
+		this.cbs = [ ];
+		
+		return new Proxy(target, this);
+	} //ctor
+	
+	static bind(...args) {
+		return new Binder(...args);
+	} //bind
+	
+	register(handle, index) {
+		if (!this.cbs.includes(handle)) {
+			if (index) return this.cbs.splice(index, 0, handle) || this;
+			else return this.cbs.push(handle) || this;
+		}
+		
+		return this;
+	} //register
+	
+	unregister(handle, replace) {
+		if (typeof handle == "number") handle = this.cbs[handle];
+		if (typeof replace == "number") replace = this.cbs[replace];
+		
+		if (this.cbs.includes(handle)) {
+			if (replace) {
+				if (this.cbs.includes(replace)) this.unregister(replace);
+				
+				return this.cbs.splice(this.cbs.findIndex(h => h == handle), 1, replace) || this;
+			} else return this.cbs.splice(this.cbs.findIndex(h => h == handle), 1) || this;
+		}
+		
+		return this;
+	} //unregister
+	
+	callback(target, d1 = target, d2 = d1, rcv = d2) {
+		let ret = false;
+		
+		for (const cb of this.cbs)
+			if (ret = cb(target, d1, d2, rcv)) return ret;
+		
+		return false;
+	} //callback
+	
+	apply(target, thisArg, argumentsList) {
+		let ret;
+		
+		if (!(ret = this.callback(target, thisArg, argumentsList)))
+			return Reflect.apply(target, thisArg, argumentsList);
+		
+		return ret;
+	} //apply
+	
+	construct(target, argumentsList, newTarget) {
+		let ret;
+		
+		if (!(ret = this.callback(target, argumentsList, newTarget)))
+			return Reflect.construct(target, argumentsList, newTarget);
+		
+		return ret;
+	} //construct
+	
+	defineProperty(target, property, descriptor) {
+		let ret;
+		
+		if (!(ret = this.callback(target, property, descriptor)))
+			return Reflect.construct(target, argumentsList, newTarget);
+		
+		return ret;
+	} //defineProperty
+	
+	deleteProperty(target, property) {
+		let ret;
+		
+		if (!(ret = this.callback(target, property)))
+			return Reflect.deleteProperty(target, property);
+		
+		return ret;
+	} //deleteProperty
+	
+	get(target, property, receiver) {
+		let ret;
+		
+		if (!(ret = this.callback(target, property, receiver)))
+			return Reflect.get(target, property, receiver);
+		
+		return ret;
+	} //get
+	
+	getOwnPropertyDescriptor(target, property) {
+		let ret;
+		
+		if (!(ret = this.callback(target, property)))
+			return Reflect.getOwnPropertyDescriptor(target, property);
+		
+		return ret;
+	} //getOwnPropertyDescriptor
+	
+	getPrototypeOf(target) {
+		let ret;
+		
+		if (!(ret = this.callback(target)))
+			return Reflect.getPrototypeOf(target);
+		
+		return ret;
+	} //getPrototypeOf
+	
+	has(target, property) {
+		let ret;
+		
+		if (!(ret = this.callback(target, property)))
+			return Reflect.has(target, property);
+		
+		return ret;
+	} //has
+	
+	isExtensible(target) {
+		let ret;
+		
+		if (!(ret = this.callback(target)))
+			return Reflect.isExtensible(target);
+		
+		return ret;
+	} //isExtensible
+	
+	ownKeys(target) {
+		let ret;
+		
+		if (!(ret = this.callback(target)))
+			return Reflect.ownKeys(target);
+		
+		return ret;
+	} //ownKeys
+	
+	preventExtensions(target) {
+		let ret;
+		
+		if (!(ret = this.callback(target)))
+			return Reflect.preventExtensions(target);
+		
+		return ret;
+	} //preventExtensions
+	
+	set(target, property, value, receiver) {
+		let ret;
+		
+		if (!(ret = this.callback(target, property, value, receiver)))
+			return Reflect.set(target, property, value, receiver);
+		
+		return ret;
+	} //set
+	
+	setPrototypeOf(target, prototype) {
+		let ret;
+		
+		if (!(ret = this.callback(target, prototype)))
+			return Reflect.setPrototypeOf(target, prototype);
+		
+		return ret;
+	} //setPrototypeOf
+	
+} //Binder
+
+if (typeof HTMLCollection != "undefined" && !HTMLCollection.prototype.forEach) HTMLCollection.prototype.forEach = Array.prototype.forEach;
+if (typeof HTMLCollection != "undefined" && !HTMLCollection.prototype.filter) HTMLCollection.prototype.filter = Array.prototype.filter;
+if (typeof HTMLCollection != "undefined" && !HTMLCollection.prototype.find) HTMLCollection.prototype.find = Array.prototype.find;
+if (typeof HTMLCollection != "undefined" && !HTMLCollection.prototype.findIndex) HTMLCollection.prototype.find = Array.prototype.findIndex;
+if (typeof HTMLCollection != "undefined" && !HTMLCollection.prototype.findAll) HTMLCollection.prototype.findAll = Array.prototype.findAll;
+if (typeof HTMLCollection != "undefined" && !HTMLCollection.prototype.some) HTMLCollection.prototype.some = Array.prototype.some;
+if (typeof HTMLCollection != "undefined" && !HTMLCollection.prototype.every) HTMLCollection.prototype.every = Array.prototype.every;
+if (typeof HTMLCollection != "undefined" && !HTMLCollection.prototype.splice) HTMLCollection.prototype.splice = Array.prototype.splice;
 if (!Array.prototype.shuffle) (HTMLCollection || Array).prototype.shuffle = Array.prototype.shuffle = function shuffle() {
 	let i = this.length;
 	
